@@ -3,6 +3,9 @@ import { EXPERTS, EXPERT_PROMPTS } from '@/config/experts';
 import { streamDeepSeek } from '@/lib/deepseek';
 import { ExpertType } from '@/types';
 
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: NextRequest) {
   const { userInput, initialIdea } = await request.json();
 

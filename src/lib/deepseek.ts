@@ -1,9 +1,16 @@
 import OpenAI from 'openai';
 
-const deepseek = new OpenAI({
-  apiKey: process.env.DEEPSEEK_API_KEY,
-  baseURL: 'https://api.deepseek.com',
-});
+let deepseek: OpenAI | null = null;
+
+function getClient(): OpenAI {
+  if (!deepseek) {
+    deepseek = new OpenAI({
+      apiKey: process.env.DEEPSEEK_API_KEY,
+      baseURL: 'https://api.deepseek.com',
+    });
+  }
+  return deepseek;
+}
 
 interface StreamChunk {
   content: string;
@@ -18,7 +25,7 @@ export async function* streamDeepSeek(
   messages: { role: 'system' | 'user' | 'assistant'; content: string }[],
   options: StreamOptions = {},
 ): AsyncGenerator<StreamChunk> {
-  const stream = await deepseek.chat.completions.create({
+  const stream = await getClient().chat.completions.create({
     model: 'deepseek-chat',
     messages,
     temperature: options.temperature ?? 0.8,
