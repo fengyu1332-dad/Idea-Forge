@@ -57,11 +57,12 @@ export async function POST(request: NextRequest) {
             controller.close();
           }
         } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
           console.error('Stream error:', error);
           if (!streamClosed) {
             streamClosed = true;
             try {
-              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: '', done: true, error: true })}\n\n`));
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: '', done: true, error: true, message })}\n\n`));
               controller.close();
             } catch {
               // controller already closed

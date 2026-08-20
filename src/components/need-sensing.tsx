@@ -94,14 +94,17 @@ export function NeedSensing({ onSkip, onSelectDirection, methods }: NeedSensingP
             try {
               const data = JSON.parse(line.slice(6));
               if (data.error) {
-                throw new Error(t('error.llmService'));
+                const detail = typeof data.message === 'string' ? data.message : '';
+                const err = new Error(detail || t('error.llmService'));
+                err.name = 'LlmServiceError';
+                throw err;
               }
               if (data.content) {
                 accumulated += data.content;
                 setAnalysisResult(accumulated);
               }
             } catch (e) {
-              if (e instanceof Error && e.message === t('error.llmService')) {
+              if (e instanceof Error && e.name === 'LlmServiceError') {
                 throw e;
               }
             }
