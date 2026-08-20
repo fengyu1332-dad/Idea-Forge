@@ -184,6 +184,44 @@ export const translations = {
   'admin.username': { zh: '用户名', en: 'Username' },
   'admin.password': { zh: '密码', en: 'Password' },
 
+  // === 引导（Onboarding）===
+  'onboarding.welcome': { zh: '欢迎使用灵感锻造炉 IdeaForge', en: 'Welcome to IdeaForge' },
+  'onboarding.subtitle': { zh: '5步将你的毛坯想法锻造为成熟产品方案。每个阶段都可以随时返回修改。', en: 'Forge your raw idea into a polished product plan in 5 steps. Return to any stage to revise at any time.' },
+  'onboarding.start': { zh: '开始使用', en: 'Get Started' },
+  'onboarding.step1.title': { zh: '需求感知', en: 'Need Sensing' },
+  'onboarding.step1.desc': { zh: '描述你的痛点或需求，AI 运用创新方法论（TRIZ、JTBD、第一性原理等）深入分析，给出最佳创新方向。', en: 'Describe your pain point or need. AI applies innovation methodologies (TRIZ, JTBD, First Principles, etc.) to analyze deeply and suggest the best direction.' },
+  'onboarding.step2.title': { zh: '灵感输入', en: 'Idea Input' },
+  'onboarding.step2.desc': { zh: '选择创新方向后，用大白话描述你的产品想法。可以是模糊的、不完整的，AI 会帮你完善。', en: 'After choosing a direction, describe your product idea in plain language. It can be vague or incomplete — AI will help refine it.' },
+  'onboarding.step3.title': { zh: '初步构想', en: 'Initial Concept' },
+  'onboarding.step3.desc': { zh: 'AI 根据你的想法生成初步产品方案，你可以直接编辑和修改内容，确认后进入专家考验。', en: 'AI generates an initial product concept from your idea. Edit it directly, then confirm to enter expert review.' },
+  'onboarding.step4.title': { zh: '专家考验', en: 'Expert Review' },
+  'onboarding.step4.desc': { zh: '五位领域专家（产品、市场、技术、设计、营销）同时审视方案，给出诚实、可操作的意见。你勾选认可的意见进入最终合成。', en: 'Five experts (product, market, tech, design, marketing) review your plan simultaneously and give honest, actionable feedback. Check the ones you accept to proceed.' },
+  'onboarding.step5.title': { zh: '终极熔铸', en: 'Final Synthesis' },
+  'onboarding.step5.desc': { zh: '综合你的想法和专家意见，AI 生成完整的《产品综合商业计划与需求文档》，包含市场分析、功能规划、技术架构、GTM策略等。', en: 'AI synthesizes your idea and expert opinions into a complete Product Business Plan & Requirements Document, covering market analysis, features, architecture, GTM strategy, and more.' },
+
+  // === 项目列表 ===
+  'projectList.title': { zh: '我的项目', en: 'My Projects' },
+  'projectList.new': { zh: '新建项目', en: 'New Project' },
+  'projectList.empty': { zh: '暂无项目', en: 'No projects yet' },
+  'projectList.emptyDesc': { zh: '开始一个新的需求分析，系统会自动创建项目并保存全部过程数据', en: 'Start a new need analysis and the system will automatically create and save a project.' },
+  'projectList.completed': { zh: '已完成', en: 'Completed' },
+  'projectList.deleteTitle': { zh: '确认删除项目？', en: 'Delete this project?' },
+  'projectList.deleteDesc': { zh: '删除后项目数据将无法恢复。此操作不可撤销。', en: 'The project data will be permanently deleted. This cannot be undone.' },
+  'projectList.cancel': { zh: '取消', en: 'Cancel' },
+  'projectList.confirmDelete': { zh: '确认删除', en: 'Delete' },
+  'projectList.justNow': { zh: '刚刚', en: 'just now' },
+
+  // === Markdown ===
+  'markdown.waiting': { zh: '等待生成内容...', en: 'Waiting for content...' },
+
+  // === 需求感知补充 ===
+  'sensing.mode': { zh: '模式', en: 'Mode' },
+  'sensing.basicMode': { zh: '基础版', en: 'Basic' },
+
+  // === 页面提示 ===
+  'page.projectLoaded': { zh: '项目已加载', en: 'Project loaded' },
+  'page.unsavedConfirm': { zh: '当前有未保存的工作，确定要新建项目吗？', en: 'You have unsaved work. Are you sure you want to start a new project?' },
+
   // === 语言切换 ===
   'lang.zh': { zh: '中文', en: '中文' },
   'lang.en': { zh: 'English', en: 'English' },

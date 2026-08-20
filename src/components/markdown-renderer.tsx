@@ -1,12 +1,14 @@
 'use client';
 
 import { useMemo } from 'react';
+import { useLanguage } from '@/hooks/useLanguage';
 
 interface MarkdownRendererProps {
   content: string;
 }
 
 export function MarkdownRenderer({ content }: MarkdownRendererProps) {
+  const { t } = useLanguage();
   const html = useMemo(() => {
     if (!content) return '';
     
@@ -45,7 +47,7 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
   if (!content) {
     return (
       <div className="text-slate-500 text-center py-8">
-        等待生成内容...
+        {t('markdown.waiting')}
       </div>
     );
   }

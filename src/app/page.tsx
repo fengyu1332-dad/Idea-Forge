@@ -93,12 +93,12 @@ export default function HomePage() {
     setShowAdviceSummary(data.showAdviceSummary);
     setSelectedDirection(data.selectedDirection);
     setStage(data.currentStage);
-    toast.success('项目已加载');
+    toast.success(t('page.projectLoaded'));
   };
 
   const handleNewProject = () => {
     if (stage !== 'need-sensing' && (userInput || initialIdea)) {
-      if (!window.confirm('当前有未保存的工作，确定要新建项目吗？')) return;
+      if (!window.confirm(t('page.unsavedConfirm'))) return;
     }
     reset();
   };

@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { FolderOpen, Trash2, FileText, Plus, Loader2 } from 'lucide-react';
 import { ProjectSummary, WorkflowStage } from '@/types';
+import { useLanguage } from '@/hooks/useLanguage';
 
 interface ProjectListProps {
   projectList: ProjectSummary[];
@@ -32,12 +33,12 @@ interface ProjectListProps {
   onNewProject: () => void;
 }
 
-const STAGE_LABELS: Record<WorkflowStage, string> = {
-  'need-sensing': '需求感知',
-  'input': '灵感输入',
-  'initial-idea': '初步构想',
-  'expert-review': '专家考验',
-  'synthesis': '终极熔铸',
+const STAGE_I18N_KEYS: Record<WorkflowStage, string> = {
+  'need-sensing': 'stage.needSensing',
+  'input': 'stage.input',
+  'initial-idea': 'stage.initialIdea',
+  'expert-review': 'stage.expertReview',
+  'synthesis': 'stage.synthesis',
 };
 
 const STAGE_COLORS: Record<WorkflowStage, string> = {
@@ -48,16 +49,16 @@ const STAGE_COLORS: Record<WorkflowStage, string> = {
   'synthesis': 'bg-green-500/30 text-green-300 border-green-500/30',
 };
 
-function timeAgo(dateStr: string): string {
+function timeAgo(dateStr: string, lang: 'zh' | 'en'): string {
   const diff = Date.now() - new Date(dateStr).getTime();
   const minutes = Math.floor(diff / 60000);
-  if (minutes < 1) return '刚刚';
-  if (minutes < 60) return `${minutes} 分钟前`;
+  if (minutes < 1) return lang === 'zh' ? '刚刚' : 'just now';
+  if (minutes < 60) return lang === 'zh' ? `${minutes} 分钟前` : `${minutes} min ago`;
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours} 小时前`;
+  if (hours < 24) return lang === 'zh' ? `${hours} 小时前` : `${hours} hr ago`;
   const days = Math.floor(hours / 24);
-  if (days < 30) return `${days} 天前`;
-  return new Date(dateStr).toLocaleDateString('zh-CN');
+  if (days < 30) return lang === 'zh' ? `${days} 天前` : `${days} d ago`;
+  return new Date(dateStr).toLocaleDateString(lang === 'zh' ? 'zh-CN' : 'en-US');
 }
 
 export function ProjectList({
@@ -67,6 +68,7 @@ export function ProjectList({
   onDeleteProject,
   onNewProject,
 }: ProjectListProps) {
+  const { t, language } = useLanguage();
   const [open, setOpen] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -92,7 +94,7 @@ export function ProjectList({
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 hover:bg-slate-700 hover:text-white transition-colors text-sm"
           >
             <FolderOpen className="w-4 h-4" />
-            我的项目
+            {t('projectList.title')}
           </Button>
         </SheetTrigger>
         <SheetContent className="w-[420px] sm:max-w-[420px] bg-slate-900 border-slate-700 text-white p-0">
@@ -100,7 +102,7 @@ export function ProjectList({
             <div className="flex items-center justify-between">
               <SheetTitle className="text-white flex items-center gap-2 text-base">
                 <FolderOpen className="w-4 h-4 text-orange-400" />
-                我的项目
+                {t('projectList.title')}
               </SheetTitle>
               <Button
                 variant="ghost"
@@ -109,7 +111,7 @@ export function ProjectList({
                 className="text-xs text-orange-400 hover:text-orange-300 h-7"
               >
                 <Plus className="w-3.5 h-3.5 mr-1" />
-                新建项目
+                {t('projectList.new')}
               </Button>
             </div>
           </SheetHeader>
@@ -121,8 +123,8 @@ export function ProjectList({
             ) : projectList.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-slate-500 px-6">
                 <FileText className="w-12 h-12 mb-3 opacity-30" />
-                <p className="text-sm">暂无项目</p>
-                <p className="text-xs mt-1 text-center">开始一个新的需求分析，系统会自动创建项目并保存全部过程数据</p>
+                <p className="text-sm">{t('projectList.empty')}</p>
+                <p className="text-xs mt-1 text-center">{t('projectList.emptyDesc')}</p>
                 <Button
                   variant="outline"
                   size="sm"
@@ -130,7 +132,7 @@ export function ProjectList({
                   className="mt-4 border-slate-600 text-slate-300 hover:bg-slate-800"
                 >
                   <Plus className="w-3.5 h-3.5 mr-1" />
-                  新建项目
+                  {t('projectList.new')}
                 </Button>
               </div>
             ) : (
@@ -153,11 +155,11 @@ export function ProjectList({
                             variant="outline"
                             className={`text-[10px] px-1.5 py-0 h-4 ${STAGE_COLORS[project.currentStage] || 'bg-slate-600'}`}
                           >
-                            {STAGE_LABELS[project.currentStage] || project.currentStage}
+                            {t(STAGE_I18N_KEYS[project.currentStage]) || project.currentStage}
                           </Badge>
-                          <span className="text-slate-500 text-[10px]">{timeAgo(project.updatedAt)}</span>
+                          <span className="text-slate-500 text-[10px]">{timeAgo(project.updatedAt, language)}</span>
                           {project.isCompleted && (
-                            <span className="text-green-500 text-[10px]">✓ 已完成</span>
+                            <span className="text-green-500 text-[10px]">✓ {t('projectList.completed')}</span>
                           )}
                         </div>
                       </div>
@@ -196,14 +198,14 @@ export function ProjectList({
       <AlertDialog open={!!deletingId} onOpenChange={(v) => { if (!v) setDeletingId(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>确认删除项目？</AlertDialogTitle>
+            <AlertDialogTitle>{t('projectList.deleteTitle')}</AlertDialogTitle>
             <AlertDialogDescription>
-              删除后项目数据将无法恢复。此操作不可撤销。
+              {t('projectList.deleteDesc')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setDeletingId(null)}>取消</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete}>确认删除</AlertDialogAction>
+            <AlertDialogCancel onClick={() => setDeletingId(null)}>{t('projectList.cancel')}</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete}>{t('projectList.confirmDelete')}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

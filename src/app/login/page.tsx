@@ -25,8 +25,8 @@ export default function LoginPage() {
 
     try {
       await login(username.trim(), password);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t('auth.loginError'));
+    } catch {
+      setError(t('auth.loginError'));
     } finally {
       setIsSubmitting(false);
     }

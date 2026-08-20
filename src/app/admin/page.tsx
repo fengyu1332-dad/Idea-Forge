@@ -213,7 +213,7 @@ export default function AdminPage() {
                       : (t('admin.roleUser') || '普通用户')}
                   </Badge>
                   {u.id === user?.userId && (
-                    <span className="text-xs text-slate-500">(你)</span>
+                    <span className="text-xs text-slate-500">({language === 'zh' ? '你' : 'you'})</span>
                   )}
                 </div>
                 <div className="flex items-center gap-3">

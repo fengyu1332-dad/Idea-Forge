@@ -266,7 +266,7 @@ export function NeedSensing({ onSkip, onSelectDirection, methods }: NeedSensingP
                     {method.modes && method.modes.length > 0 && isSelected && (
                       <div className="flex items-center gap-3 mt-2 ml-6">
                         <span className="text-xs text-slate-500">
-                          {t('sensing.mode') || '模式'}:
+                          {t('sensing.mode')}:
                         </span>
                         <label className="flex items-center gap-1.5 cursor-pointer">
                           <input
@@ -282,7 +282,7 @@ export function NeedSensing({ onSkip, onSelectDirection, methods }: NeedSensingP
                             }}
                             className="w-3 h-3 text-orange-500 accent-orange-500"
                           />
-                          <span className="text-xs text-slate-300">{method.name} 基础版</span>
+                          <span className="text-xs text-slate-300">{method.name} {t('sensing.basicMode')}</span>
                         </label>
                         {method.modes.map(mode => (
                           <label key={mode.id} className="flex items-center gap-1.5 cursor-pointer">
