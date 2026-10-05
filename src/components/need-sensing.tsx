@@ -1,14 +1,17 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, Sparkles, ChevronDown, ChevronUp, Pencil, RotateCcw } from 'lucide-react';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useAuth } from '@/hooks/useAuth';
-import { InnovationMethod, getMethodDefaultPrompt } from '@/config/need-sensing';
+import { InnovationMethod } from '@/config/need-sensing';
+import { readGenerationStream } from '@/lib/generation-stream';
+import { getGenerationErrorMessage } from '@/lib/generation-errors';
 
 interface NeedSensingProps {
   onSkip: () => void;
@@ -25,10 +28,11 @@ interface NeedSensingProps {
 }
 
 export function NeedSensing({ onSkip, onSelectDirection, methods }: NeedSensingProps) {
-  const { t, language } = useLanguage();
+  const { t } = useLanguage();
   const { isAdmin } = useAuth();
   const [userNeed, setUserNeed] = useState('');
   const [analysisResult, setAnalysisResult] = useState('');
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedMethodIds, setSelectedMethodIds] = useState<string[]>(['triz']);
   const [customMethodPrompts, setCustomMethodPrompts] = useState<Record<string, string>>({});
@@ -62,6 +66,7 @@ export function NeedSensing({ onSkip, onSelectDirection, methods }: NeedSensingP
     if (!userNeed.trim() || selectedMethodIds.length === 0) return;
     setIsLoading(true);
     setAnalysisResult('');
+    setAnalysisError(null);
     setDirections([]);
 
     try {
@@ -76,40 +81,10 @@ export function NeedSensing({ onSkip, onSelectDirection, methods }: NeedSensingP
         }),
       });
 
-      if (!response.ok) throw new Error(t('error.generate'));
-
-      const reader = response.body?.getReader();
-      if (!reader) throw new Error('No reader');
-
-      const decoder = new TextDecoder();
       let accumulated = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const chunk = decoder.decode(value);
-        const lines = chunk.split('\n');
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            try {
-              const data = JSON.parse(line.slice(6));
-              if (data.error) {
-                const detail = typeof data.message === 'string' ? data.message : '';
-                const err = new Error(detail || t('error.llmService'));
-                err.name = 'LlmServiceError';
-                throw err;
-              }
-              if (data.content) {
-                accumulated += data.content;
-                setAnalysisResult(accumulated);
-              }
-            } catch (e) {
-              if (e instanceof Error && e.name === 'LlmServiceError') {
-                throw e;
-              }
-            }
-          }
-        }
+      for await (const content of readGenerationStream(response)) {
+        accumulated += content;
+        setAnalysisResult(accumulated);
       }
 
       // Parse directions from accumulated result
@@ -156,13 +131,13 @@ export function NeedSensing({ onSkip, onSelectDirection, methods }: NeedSensingP
       }
     } catch (error) {
       console.error('Error:', error);
-      setAnalysisResult(t('error.generate'));
+      setAnalysisError(getGenerationErrorMessage(error, t));
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleSelectDirection = (direction: { title: string; description: string }, index: number) => {
+  const handleSelectDirection = (direction: { title: string; description: string }) => {
     onSelectDirection({
       userNeed,
       analysisResult,
@@ -363,6 +338,12 @@ export function NeedSensing({ onSkip, onSelectDirection, methods }: NeedSensingP
             </Button>
           </div>
 
+          {analysisError && (
+            <Alert variant="destructive" className="border-red-500/50 bg-slate-900 text-red-400">
+              <AlertDescription className="text-red-400">{analysisError}</AlertDescription>
+            </Alert>
+          )}
+
           {/* 分析结果 */}
           {analysisResult && (
             <div className="space-y-4">
@@ -380,7 +361,7 @@ export function NeedSensing({ onSkip, onSelectDirection, methods }: NeedSensingP
                     <div
                       key={index}
                       className="rounded-lg border border-slate-700 bg-slate-800/50 p-3 hover:border-orange-500/50 transition-colors cursor-pointer"
-                      onClick={() => handleSelectDirection(direction, index)}
+                      onClick={() => handleSelectDirection(direction)}
                     >
                       <div className="flex items-center justify-between">
                         <h4 className="text-white text-sm font-medium">{direction.title}</h4>

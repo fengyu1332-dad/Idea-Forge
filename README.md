@@ -32,9 +32,38 @@ pnpm start
 
 ```
 DEEPSEEK_API_KEY=sk-your-api-key
+# 可选，未设置时默认使用 deepseek-flash
+DEEPSEEK_MODEL=deepseek-flash
 ```
 
 在 [DeepSeek Platform](https://platform.deepseek.com/api_keys) 获取 API Key。
+
+默认模型为 `deepseek-flash`，并显式关闭思考模式，以保持原有的直接输出行为。旧模型名 `deepseek-chat` / `deepseek-reasoner` 已于 2026-07-24 停用；仅更换 API Key 无法修复仍调用旧模型的代码。可通过服务端环境变量 `DEEPSEEK_MODEL` 指定当前可用的模型。
+
+参考：[旧模型停用公告](https://api-docs.deepseek.com/news/news260424/)、[当前模型调用说明](https://api-docs.deepseek.com/news/news260910/)。
+
+### Vercel 部署与生成失败排查
+
+本地 `.env.local` 已被 Git 忽略，不会随代码推送到 Vercel。请在 Vercel 项目的 **Settings → Environment Variables** 中设置服务端变量 `DEEPSEEK_API_KEY`，选择 **Production**（需要预览部署时也选择 **Preview**）。不要添加 `NEXT_PUBLIC_` 前缀。
+
+更换密钥后，必须重新部署才能让线上函数读取新值；仅保存环境变量不会更新旧部署。登录功能还需要单独配置 `JWT_SECRET`。
+
+模型迁移还需要把本地修复代码提交并部署到 Vercel。旧代码把模型名称写死为 `deepseek-chat`，不读取 `DEEPSEEK_MODEL`；仅给旧部署新增这个变量也不会生效。
+
+“Generation failed. Please retry.” 是原有前端的通用提示，无法据此判断根因。需求感知页面现在会显示分类后的错误：
+
+| 错误 | 处理方式 |
+| --- | --- |
+| 未配置密钥 | 在对应 Vercel 环境中添加 `DEEPSEEK_API_KEY` 并重新部署 |
+| HTTP 401 / 密钥无效 | 在 DeepSeek 平台创建有效密钥，更新 Vercel 环境变量并重新部署；本地开发也需更新 `.env.local` 并重启 |
+| HTTP 402 / 余额不足 | 检查并补充 DeepSeek API 账户余额 |
+| HTTP 400 / 404 / 422 | 在 Vercel Logs 中定位 `generate-need-sensing` 请求，检查模型名称及参数是否受当前 API 支持 |
+| HTTP 429 | 稍后重试或减少同时生成的请求 |
+| 超时 / 连接中断 | 检查 Vercel Logs 中是否有 `FUNCTION_INVOCATION_TIMEOUT`，再检查函数运行时限和 DeepSeek 服务状态 |
+
+不要把完整密钥贴入日志、截图或提交到 Git。服务端仅记录分类错误和 HTTP 状态，无效密钥等确定性错误不会反复重试。
+
+参考：[Vercel 环境变量文档](https://vercel.com/docs/environment-variables/managing-environment-variables)。
 
 ## 项目结构
 

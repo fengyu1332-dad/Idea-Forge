@@ -147,6 +147,14 @@ export const translations = {
   // === 错误 ===
   'error.generate': { zh: '生成失败，请重试', en: 'Generation failed. Please retry.' },
   'error.llmService': { zh: 'AI服务暂时不可用，请稍后重试', en: 'AI service is temporarily unavailable. Please try again later.' },
+  'error.missingApiKey': { zh: 'AI 服务尚未配置，请联系网站管理员。', en: 'The AI service is not configured. Please contact the site administrator.' },
+  'error.invalidApiKey': { zh: 'DeepSeek API 密钥无效，请联系网站管理员更新密钥。', en: 'The DeepSeek API key is invalid. Please contact the site administrator to update it.' },
+  'error.insufficientBalance': { zh: 'DeepSeek API 账户余额不足，请联系网站管理员。', en: 'The DeepSeek API account has insufficient balance. Please contact the site administrator.' },
+  'error.invalidAiRequest': { zh: 'AI 服务拒绝了请求，请联系网站管理员检查模型和参数配置。', en: 'The AI service rejected the request. Please contact the site administrator to check the model and parameters.' },
+  'error.rateLimited': { zh: 'AI 服务请求过于频繁，请稍后重试。', en: 'The AI service is receiving too many requests. Please try again later.' },
+  'error.aiTimeout': { zh: 'AI 服务响应超时，请稍后重试。', en: 'The AI service timed out. Please try again later.' },
+  'error.streamInterrupted': { zh: '生成连接中断，已保留收到的内容，请重新生成。', en: 'The generation connection was interrupted. Received content has been kept. Please generate again.' },
+  'error.invalidResponse': { zh: 'AI 服务返回的数据不完整或格式异常，请重试。', en: 'The AI service returned an incomplete or invalid response. Please try again.' },
 
   // === 专家名称 ===
   'expert.product-architect': { zh: '产品策划专家', en: 'Product Architect' },

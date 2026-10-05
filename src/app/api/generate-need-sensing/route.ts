@@ -2,19 +2,18 @@ import { NextRequest } from 'next/server';
 import { streamDeepSeek } from '@/lib/deepseek';
 import { buildNeedSensingPrompt } from '@/config/need-sensing';
 import { getAuthUser } from '@/lib/auth';
+import { GenerationError } from '@/lib/generation-errors';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
   try {
-    let { userNeed, selectedMethodIds, customMethodPrompts, selectedMethodModes } = await request.json();
+    const { userNeed, selectedMethodIds, customMethodPrompts, selectedMethodModes } = await request.json();
 
     // 非管理员用户不能使用自定义 Prompt
     const user = await getAuthUser(request);
-    if (user?.role !== 'admin') {
-      customMethodPrompts = {};
-    }
+    const allowedCustomPrompts = user?.role === 'admin' ? customMethodPrompts || {} : {};
 
     if (!userNeed || typeof userNeed !== 'string') {
       return new Response(JSON.stringify({ error: '请描述您的需求或困惑' }), {
@@ -26,7 +25,7 @@ export async function POST(request: NextRequest) {
     // 根据选择的方法论动态组装 system prompt
     const systemPrompt = buildNeedSensingPrompt(
       selectedMethodIds || [],
-      customMethodPrompts || {},
+      allowedCustomPrompts,
       selectedMethodModes || {},
     );
 
@@ -62,7 +61,12 @@ export async function POST(request: NextRequest) {
           if (!streamClosed) {
             streamClosed = true;
             try {
-              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: '', done: true, error: true, message })}\n\n`));
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+                content: '', done: true, error: true,
+                message: error instanceof GenerationError ? message : 'AI generation failed.',
+                code: error instanceof GenerationError ? error.code : 'AI_UNAVAILABLE',
+                status: error instanceof GenerationError ? error.status : undefined,
+              })}\n\n`));
               controller.close();
             } catch {
               // controller already closed
