@@ -82,7 +82,7 @@ export function SynthesisPanel({
 
         {(finalDocument || isGenerating) && (
           <>
-            <ScrollArea className="h-[600px] w-full rounded-lg border border-slate-700 bg-slate-950 p-6">
+            <ScrollArea className="h-[600px] w-full rounded-lg border border-slate-700 bg-slate-950 p-6 [&_[data-radix-scroll-area-viewport]>div]:!block">
               <MarkdownRenderer content={finalDocument.replace(/\[SECTION_COMPLETE\]/g, '')} />
               {isGenerating && (
                 <div className="flex items-center gap-2 text-slate-400 mt-4">
@@ -96,7 +96,7 @@ export function SynthesisPanel({
               <div className="flex flex-col gap-4">
                 <div className="flex justify-between">
                   <AlertDialog open={showResetDialog} onOpenChange={setShowResetDialog}>
-                    <Button variant="outline" onClick={() => setShowResetDialog(true)} className="border-slate-600 text-slate-300">
+                    <Button variant="outline" onClick={() => setShowResetDialog(true)} className="border-slate-600 bg-slate-800 text-slate-100 hover:bg-slate-700">
                       {t('synthesis.restart')}
                     </Button>
                     <AlertDialogContent>
@@ -125,7 +125,7 @@ export function SynthesisPanel({
                     <Button
                       onClick={onExportMarkdown}
                       variant="outline"
-                      className="border-slate-600 text-slate-300"
+                      className="border-slate-600 bg-slate-800 text-slate-100 hover:bg-slate-700"
                     >
                       <Download className="w-4 h-4 mr-2" />
                       {t('synthesis.exportFinal')}
