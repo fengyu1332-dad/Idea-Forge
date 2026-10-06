@@ -5,7 +5,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Sparkles,
   ArrowRight,
@@ -16,8 +15,13 @@ import {
   Search,
   Globe
 } from 'lucide-react';
-import { ExpertType, ExpertReport, WorkflowStage, AdviceItem } from '@/types';
-import { EXPERTS } from '@/config/experts';
+import { ExpertType, ExpertReport, WorkflowStage, AdviceItem, ProblemType } from '@/types';
+import { getExperts } from '@/config/experts';
+import { PROBLEM_PROFILES } from '@/config/problem-types';
+import { SYNTHESIS_SECTION_COUNT } from '@/config/synthesis';
+import { readGenerationStream } from '@/lib/generation-stream';
+import { GenerationError, getGenerationErrorMessage } from '@/lib/generation-errors';
+import { ProblemTypeSelector } from '@/components/problem-type-selector';
 import { INNOVATION_METHODS } from '@/config/need-sensing';
 import { NeedSensing } from '@/components/need-sensing';
 import { ExpertReviewPanel } from '@/components/expert-review-panel';
@@ -35,6 +39,11 @@ import { toast } from 'sonner';
 export default function HomePage() {
   const { language, setLanguage, t } = useLanguage();
   const { user, isAdmin, isAuthenticated, logout } = useAuth();
+  const [problemType, setProblemType] = useState<ProblemType>('product');
+  const [isCompleted, setIsCompleted] = useState(false);
+  const [isLegacy, setIsLegacy] = useState(false);
+  const [generationError, setGenerationError] = useState('');
+  const profile = PROBLEM_PROFILES[problemType];
   const [stage, setStage] = useState<WorkflowStage>('need-sensing');
   const [userInput, setUserInput] = useState('');
   const [initialIdea, setInitialIdea] = useState('');
@@ -61,16 +70,20 @@ export default function HomePage() {
     createNewProject,
     loadProject,
     saveProject,
+    resetProject,
     deleteProject,
-    refreshList,
   } = useProject();
+
+  const progress = stage === 'need-sensing' ? 0 : stage === 'input' ? 10
+    : stage === 'initial-idea' ? 20 : stage === 'expert-review' ? (showAdviceSummary ? 50 : 35)
+    : isCompleted ? 100 : 65;
 
   // 自动保存：关键状态变更时 save 到服务端
   useEffect(() => {
     if (!projectId || stage === 'need-sensing') return;
     saveProject({
       currentStage: stage,
-      progress: calculateProgress(),
+      progress,
       userInput,
       initialIdea,
       expertReports,
@@ -78,13 +91,19 @@ export default function HomePage() {
       needSensingData,
       showAdviceSummary,
       selectedDirection,
-      isCompleted: stage === 'synthesis' && !!finalDocument,
+      isCompleted,
+      problemType,
+      workflowVersion: isLegacy ? 1 : 2,
     });
-  }, [stage, userInput, initialIdea, expertReports, finalDocument, needSensingData, showAdviceSummary, selectedDirection]);
+  }, [stage, userInput, initialIdea, expertReports, finalDocument, needSensingData, showAdviceSummary, selectedDirection, problemType, isCompleted, isLegacy, projectId, saveProject, progress]);
 
   const handleOpenProject = async (id: string) => {
     const data = await loadProject(id);
     if (!data) return;
+    setProblemType(data.problemType);
+    setIsLegacy(data.isLegacy);
+    setIsCompleted(data.isCompleted);
+    setGenerationError('');
     setUserInput(data.userInput);
     setInitialIdea(data.initialIdea);
     setFinalDocument(data.finalDocument);
@@ -97,15 +116,11 @@ export default function HomePage() {
   };
 
   const handleNewProject = () => {
-    if (stage !== 'need-sensing' && (userInput || initialIdea)) {
-      if (!window.confirm(t('page.unsavedConfirm'))) return;
-    }
+    if (stage !== 'need-sensing' && (userInput || initialIdea) && !window.confirm(t('page.unsavedConfirm'))) return;
     reset();
   };
 
-  const handleDeleteProject = async (id: string) => {
-    await deleteProject(id);
-  };
+  const handleDeleteProject = async (id: string) => { await deleteProject(id); };
 
   const skipNeedSensing = () => {
     setStage('input');
@@ -136,9 +151,8 @@ export default function HomePage() {
     setSelectedDirection(data.selectedDirectionTitle);
     const prefix = language === 'zh' ? '基于需求感知分析' : 'Based on need sensing analysis';
     const userNeedLabel = language === 'zh' ? '用户核心需求' : 'Core user need';
-    const gapLabel = language === 'zh' ? '需求缺口分析' : 'Gap analysis';
     const dirLabel = language === 'zh' ? '选择的创新方向及方案' : 'Selected innovation direction & plan';
-    const suffix = language === 'zh' ? '请基于以上需求感知分析，帮我把这个创新方向发展成为完整的产品方案。务必紧扣分析中发现的需求缺口和用户核心诉求。' : 'Based on the need sensing analysis above, please develop this innovation direction into a complete product plan. Make sure to address the identified gaps and core user needs.';
+    const suffix = language === 'zh' ? '请保留原始约束，将此 AI 建议作为待验证方向，形成初步假设与验证思路。' : 'Preserve the original constraints. Treat this AI suggestion as an unvalidated direction and develop initial hypotheses and tests.';
 
     // 只传递精简摘要（核心需求 + 选中方向），不传递完整分析全文以节省token
     setUserInput(`${prefix}\n\n${userNeedLabel}：${data.userNeed}\n\n${dirLabel}：${data.selectedDirectionTitle}\n\n${data.selectedDirection}\n\n${suffix}`);
@@ -147,6 +161,7 @@ export default function HomePage() {
 
   const generateInitialIdea = async () => {
     if (!userInput.trim()) return;
+    setIsLegacy(false);
 
     // 自动创建项目（跳过需求感知直接输入时；游客不落盘）
     if (!projectId && isAuthenticated) {
@@ -156,71 +171,51 @@ export default function HomePage() {
 
     setIsGenerating(true);
     setInitialIdea('');
+    setExpertReports({});
+    setFinalDocument('');
+    setIsCompleted(false);
+    setGenerationError('');
     
     try {
       const response = await fetch('/api/generate-initial-idea', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userInput, language }),
+        body: JSON.stringify({ userInput, problemType, language }),
       });
 
-      if (!response.ok) throw new Error('Generation failed');
-
-      const reader = response.body?.getReader();
-      if (!reader) throw new Error('Cannot read response');
-
-      const decoder = new TextDecoder();
       let accumulatedContent = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        const chunk = decoder.decode(value);
-        const lines = chunk.split('\n');
-
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            try {
-              const data = JSON.parse(line.slice(6));
-              if (data.error) {
-                const detail = typeof data.message === 'string' ? data.message : '';
-                const err = new Error(detail || t('error.llmService'));
-                err.name = 'LlmServiceError';
-                throw err;
-              }
-              if (data.content) {
-                accumulatedContent += data.content;
-                setInitialIdea(accumulatedContent);
-              }
-            } catch (e) {
-              if (e instanceof Error && e.name === 'LlmServiceError') {
-                throw e;
-              }
-            }
-          }
-        }
+      for await (const content of readGenerationStream(response)) {
+        accumulatedContent += content;
+        setInitialIdea(accumulatedContent);
       }
 
       setStage('initial-idea');
     } catch (error) {
       console.error('Error:', error);
-      toast.error(t('error.generate'));
+      const message = getGenerationErrorMessage(error, t);
+      setGenerationError(message);
+      toast.error(message);
     } finally {
       setIsGenerating(false);
     }
   };
 
   const confirmInitialIdea = () => {
+    setGenerationError('');
     setStage('expert-review');
   };
 
   const editInitialIdea = (newContent: string) => {
     setInitialIdea(newContent);
+    setExpertReports({});
+    setFinalDocument('');
+    setIsCompleted(false);
   };
 
   const confirmExpertReports = (reports: Partial<Record<ExpertType, ExpertReport>>) => {
     setExpertReports(reports);
+    setFinalDocument('');
+    setIsCompleted(false);
     setShowAdviceSummary(true);
   };
 
@@ -241,63 +236,36 @@ export default function HomePage() {
     setIsGenerating(true);
     setFinalDocument('');
     setSynthesisProgress('');
+    setIsCompleted(false);
+    setGenerationError('');
     
     try {
       const response = await fetch('/api/generate-synthesis', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userInput, initialIdea, expertReports, needSensingData, language }),
+        body: JSON.stringify({ userInput, initialIdea, expertReports, needSensingData, problemType, language }),
       });
 
-      if (!response.ok) throw new Error('Generation failed');
-
-      const reader = response.body?.getReader();
-      if (!reader) throw new Error('Cannot read response');
-
-      const decoder = new TextDecoder();
       let accumulatedContent = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        const chunk = decoder.decode(value);
-        const lines = chunk.split('\n');
-
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            try {
-              const data = JSON.parse(line.slice(6));
-              if (data.error) {
-                const detail = typeof data.message === 'string' ? data.message : '';
-                const err = new Error(detail || t('error.llmService'));
-                err.name = 'LlmServiceError';
-                throw err;
-              }
-              if (data.content) {
-                accumulatedContent += data.content;
-                setFinalDocument(accumulatedContent);
-                // 统计 [SECTION_COMPLETE] 标记数量以显示进度
-                const sectionCount = (accumulatedContent.match(/\[SECTION_COMPLETE\]/g) || []).length;
-                if (sectionCount > 0) {
-                  setSynthesisProgress(language === 'zh'
-                    ? `已完成 ${sectionCount}/7 个章节`
-                    : `${sectionCount}/7 sections completed`);
-                }
-              }
-            } catch (e) {
-              if (e instanceof Error && e.name === 'LlmServiceError') {
-                throw e;
-              }
-            }
-          }
-        }
+      for await (const content of readGenerationStream(response)) {
+        accumulatedContent += content;
+        setFinalDocument(accumulatedContent);
+        const sectionCount = (accumulatedContent.match(/\[SECTION_COMPLETE\]/g) || []).length;
+        setSynthesisProgress(language === 'zh'
+          ? `已完成 ${Math.min(sectionCount, SYNTHESIS_SECTION_COUNT)}/${SYNTHESIS_SECTION_COUNT} 个章节`
+          : `${Math.min(sectionCount, SYNTHESIS_SECTION_COUNT)}/${SYNTHESIS_SECTION_COUNT} sections completed`);
       }
-
+      if ((accumulatedContent.match(/\[SECTION_COMPLETE\]/g) || []).length !== SYNTHESIS_SECTION_COUNT) {
+        throw new GenerationError('STREAM_INTERRUPTED', 'The plan is incomplete.');
+      }
+      setIsCompleted(true);
+      setIsLegacy(false);
       // 合成完成，自动保存已通过 useProject hook 处理
     } catch (error) {
       console.error('Error:', error);
-      toast.error(t('error.generate'));
+      const message = getGenerationErrorMessage(error, t);
+      setGenerationError(message);
+      toast.error(message);
     } finally {
       setIsGenerating(false);
     }
@@ -329,7 +297,7 @@ export default function HomePage() {
     const origLabel = t('export.originalIdea');
     const aiLabel = language === 'zh' ? 'AI生成的初步方案' : 'AI-Generated Initial Plan';
     const content = `# ${ideaLabel}\n\n## ${dateLabel}\n${date}\n\n## ${origLabel}\n${userInput}\n\n## ${aiLabel}\n${initialIdea}`;
-    const blob = new Blob([content], { type: 'text/markdown' });
+    const blob = new Blob([content.replace(/\[SECTION_COMPLETE\]/g, '')], { type: 'text/markdown' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -341,12 +309,12 @@ export default function HomePage() {
   const exportMarkdown = () => {
     const productName = extractProductName();
     const date = new Date().toISOString().split('T')[0];
-    const planLabel = language === 'zh' ? '产品综合商业计划与需求文档' : 'Product Business Plan & Requirements Document';
+    const planLabel = profile.deliverable[language] + (isCompleted ? '' : (language === 'zh' ? '（未完成草稿）' : ' (Incomplete draft)'));
     const dateLabel = t('export.generateDate');
     const origLabel = t('export.originalIdea');
     const ideaLabel = t('export.initialConceptSection');
     const content = `# ${planLabel}\n\n## ${dateLabel}\n${date}\n\n## ${origLabel}\n${userInput}\n\n## ${ideaLabel}\n${initialIdea}\n\n${finalDocument}`;
-    const blob = new Blob([content], { type: 'text/markdown' });
+    const blob = new Blob([content.replace(/\[SECTION_COMPLETE\]/g, '')], { type: 'text/markdown' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -359,7 +327,7 @@ export default function HomePage() {
     const productName = extractProductName();
     const date = new Date().toISOString().split('T')[0];
     
-    let content = `# ${productName} - ${t('export.ultimate')}\n\n**${t('export.generateDate')}**: ${date}\n\n---\n\n`;
+    let content = `# ${productName} - ${profile.deliverable[language]}\n\n${isCompleted ? '' : (language === 'zh' ? '未完成草稿\n\n' : 'Incomplete draft\n\n')}**${t('export.generateDate')}**: ${date}\n\n---\n\n`;
     
     if (needSensingData) {
       content += `## ${t('export.needSensing')}\n\n`;
@@ -390,10 +358,10 @@ export default function HomePage() {
     content += `## ${t('export.originalIdea')}\n\n${userInput}\n\n`;
     content += `## ${t('export.initialConceptSection')}\n\n${initialIdea}\n\n`;
     content += `## ${t('export.expertSection')}\n\n`;
-    EXPERTS.forEach((expert, index) => {
+    getExperts(problemType).forEach((expert, index) => {
       const report = expertReports[expert.id];
       if (report) {
-        const expertName = t(`expert.${expert.id}` as keyof typeof import('@/lib/i18n').translations);
+        const expertName = language === 'zh' ? expert.name : expert.title;
         content += `### ${index + 1}. ${expertName} - ${expert.title}\n\n`;
         
         if (report.rawContent) {
@@ -415,9 +383,9 @@ export default function HomePage() {
       }
     });
     
-    content += `## ${t('export.finalSection')}\n\n${finalDocument}\n\n`;
+    content += `## ${profile.deliverable[language]}\n\n${finalDocument}\n\n`;
     
-    const blob = new Blob([content], { type: 'text/markdown' });
+    const blob = new Blob([content.replace(/\[SECTION_COMPLETE\]/g, '')], { type: 'text/markdown' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -427,6 +395,10 @@ export default function HomePage() {
   };
 
   const reset = () => {
+    resetProject();
+    setIsLegacy(false);
+    setIsCompleted(false);
+    setGenerationError('');
     setStage('need-sensing');
     setUserInput('');
     setInitialIdea('');
@@ -437,32 +409,16 @@ export default function HomePage() {
     setNeedSensingData(null);
   };
 
-  const getExpertAcceptedCount = (report: ExpertReport | undefined): number => {
-    if (!report) return 0;
-    return report.opinions.filter((item: AdviceItem) => item.checked).length;
-  };
-
-  const calculateProgress = () => {
-    if (stage === 'need-sensing') return 0;
-    if (stage === 'input') return 10;
-    if (stage === 'initial-idea') return 20;
-    if (stage === 'expert-review') {
-      if (showAdviceSummary) return 40;
-      return 30;
-    }
-    if (stage === 'synthesis') return 100;
-    return 0;
-  };
-
-  const getStageLabel = (s: WorkflowStage) => {
-    const labels: Record<WorkflowStage, string> = {
-      'need-sensing': t('progress.needSensing'),
-      'input': t('progress.input'),
-      'initial-idea': t('progress.initialIdea'),
-      'expert-review': t('progress.expertReview'),
-      'synthesis': t('progress.synthesis'),
-    };
-    return labels[s];
+  const changeProblemType = (value: ProblemType) => {
+    if (value === problemType) return;
+    setProblemType(value);
+    setInitialIdea('');
+    setExpertReports({});
+    setFinalDocument('');
+    setNeedSensingData(null);
+    setSelectedDirection(null);
+    setIsCompleted(false);
+    setGenerationError('');
   };
 
   return (
@@ -537,9 +493,9 @@ export default function HomePage() {
         <div className="mb-8">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm text-slate-400">{t('progress.label')}</span>
-            <span className="text-sm text-slate-400">{Math.round(calculateProgress())}%</span>
+            <span className="text-sm text-slate-400">{Math.round(progress)}%</span>
           </div>
-          <Progress value={calculateProgress()} className="h-2 bg-slate-800" />
+          <Progress value={progress} className="h-2 bg-slate-800" />
           <div className="flex justify-between mt-2 text-xs text-slate-500">
             <span className={stage === 'need-sensing' ? 'text-orange-400 font-medium' : ''}>{t('progress.needSensing')}</span>
             <span className={stage === 'input' ? 'text-orange-400 font-medium' : ''}>{t('progress.input')}</span>
@@ -554,9 +510,16 @@ export default function HomePage() {
 
         {/* Main Content */}
         <div className="space-y-6">
+          {generationError && <p role="alert" className="rounded-lg border border-red-800 bg-red-950/30 p-3 text-sm text-red-300">{generationError}</p>}
+          {isLegacy && <p className="rounded-lg border border-amber-700 p-3 text-sm text-amber-300">{language === 'zh' ? '此项目来自旧版流程，原有草稿已保留。请重新生成验证计划后再用于评审。' : 'This project uses the previous workflow. Its drafts are preserved; regenerate a validation plan before review.'}</p>}
+          {stage !== 'need-sensing' && stage !== 'input' && (
+            <div className="text-sm text-orange-300">{profile.label[language]} · {profile.deliverable[language]}</div>
+          )}
           {/* Stage 0: Need Sensing */}
           {stage === 'need-sensing' && (
             <NeedSensing
+              problemType={problemType}
+              onProblemTypeChange={changeProblemType}
               onSkip={skipNeedSensing}
               onSelectDirection={selectDirection}
               methods={INNOVATION_METHODS}
@@ -572,18 +535,20 @@ export default function HomePage() {
                   {t('input.title')}
                 </CardTitle>
                 <CardDescription className="text-slate-400">
-                  {t('input.desc')}
+                  {profile.description[language]}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
+                <ProblemTypeSelector value={problemType} onChange={changeProblemType} disabled={isGenerating} />
                 <Textarea
-                  placeholder={t('input.placeholder')}
+                  placeholder={profile.placeholder[language]}
+                  disabled={isGenerating}
                   value={userInput}
                   onChange={(e) => setUserInput(e.target.value)}
                   className="min-h-[200px] bg-slate-900/50 border-slate-600 text-white placeholder:text-slate-500 focus:border-orange-500"
                 />
                 <div className="flex justify-between items-center">
-                  <Button variant="outline" onClick={() => setStage('need-sensing')} className="border-slate-600 text-slate-300">
+                  <Button variant="outline" disabled={isGenerating} onClick={() => setStage('need-sensing')} className="border-slate-600 text-slate-300">
                     <Search className="w-4 h-4 mr-2" />
                     {t('input.backToSensing')}
                   </Button>
@@ -667,6 +632,9 @@ export default function HomePage() {
           {/* Stage 3: Expert Review */}
           {stage === 'expert-review' && !showAdviceSummary && (
             <ExpertReviewPanel
+              key={`${projectId || 'guest'}-${problemType}`}
+              problemType={problemType}
+              initialReports={expertReports}
               userInput={userInput}
               initialIdea={initialIdea}
               onConfirm={confirmExpertReports}
@@ -677,6 +645,8 @@ export default function HomePage() {
           {/* Advice Summary (bridge between expert review and synthesis) */}
           {stage === 'expert-review' && showAdviceSummary && (
             <AdviceSummaryPanel
+              key={`${projectId || 'guest'}-${problemType}`}
+              problemType={problemType}
               expertReports={expertReports}
               onUpdateReports={setExpertReports}
               onProceedToSynthesis={proceedToSynthesis}
@@ -687,6 +657,8 @@ export default function HomePage() {
           {/* Stage 4: Synthesis */}
           {stage === 'synthesis' && (
             <SynthesisPanel
+              problemType={problemType}
+              isCompleted={isCompleted}
               finalDocument={finalDocument}
               isGenerating={isGenerating}
               progressText={synthesisProgress}

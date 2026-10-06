@@ -1,96 +1,47 @@
 import { NextRequest } from 'next/server';
-import { EXPERTS, EXPERT_PROMPTS } from '@/config/experts';
+import { buildExpertPrompt, getExperts } from '@/config/experts';
 import { streamDeepSeek } from '@/lib/deepseek';
-import { ExpertType } from '@/types';
+import { expertReviewRequest, invalidGenerationRequest } from '@/lib/generation-request';
+import { generationErrorEvent, SSE_HEADERS } from '@/lib/generation-response';
+import { GenerationError } from '@/lib/generation-errors';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
-  const { userInput, initialIdea } = await request.json();
-
-  if (!userInput || !initialIdea) {
-    return new Response(JSON.stringify({ error: 'Missing required fields' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
-
+  const parsed = expertReviewRequest.safeParse(await request.json().catch(() => null));
+  if (!parsed.success) return invalidGenerationRequest();
+  const { userInput, initialIdea, problemType, language, expertIds } = parsed.data;
   const encoder = new TextEncoder();
-  let streamClosed = false;
-
+  let closed = false;
   const stream = new ReadableStream({
     async start(controller) {
       const send = (data: unknown) => {
-        if (!streamClosed) {
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
-        }
+        if (!closed) controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
       };
-
       try {
-        // 并行启动5位专家的评审
-        const expertPromises = EXPERTS.map(async (expert) => {
-          const systemPrompt = EXPERT_PROMPTS[expert.id as ExpertType];
-          const userMessage = `请对以下产品方案进行专业评审：
-
-**用户原始想法**：
-${userInput}
-
-**初步构想**：
-${initialIdea}
-
-请从你的专业领域出发，给出你的意见。`;
-
-          let fullContent = '';
-          const generator = streamDeepSeek(
-            [
-              { role: 'system', content: systemPrompt },
-              { role: 'user', content: userMessage },
-            ],
-            { temperature: 0.9 },
-          );
-
-          for await (const chunk of generator) {
-            fullContent += chunk.content;
+        await Promise.allSettled(getExperts(problemType).filter(e => !expertIds || expertIds.includes(e.id)).map(async expert => {
+          try {
+            let content = '';
+            for await (const chunk of streamDeepSeek([
+              { role: 'system', content: buildExpertPrompt(expert.id, problemType, language) },
+              { role: 'user', content: JSON.stringify({ userInput, initialAiDraft: initialIdea }) },
+            ], { temperature: 0.4 })) {
+              if (closed) return;
+              content += chunk.content;
+            }
+            if (!content.trim()) throw new GenerationError('INVALID_RESPONSE', 'Empty review.');
+            send({ expertId: expert.id, content, done: false });
+          } catch (error) {
+            send({ expertId: expert.id, done: false, ...generationErrorEvent(error) });
           }
-
-          return { expertId: expert.id, content: fullContent };
-        });
-
-        // 使用 allSettled 防止单个专家失败拖垮全部
-        const results = await Promise.allSettled(expertPromises);
-        let successCount = 0;
-        for (const result of results) {
-          if (result.status === 'fulfilled') {
-            successCount++;
-            send({ expertId: result.value.expertId, content: result.value.content, done: false });
-          }
-        }
-        if (successCount === 0) {
-          send({ error: 'All expert reports failed to generate' });
-        }
+        }));
         send({ done: true });
-      } catch (error) {
-        if (!streamClosed) {
-          send({ error: 'Failed to generate expert reports' });
-          controller.close();
-        }
       } finally {
-        if (!streamClosed) {
-          controller.close();
-        }
+        if (!closed) { closed = true; controller.close(); }
       }
     },
-    cancel() {
-      streamClosed = true;
-    },
+    cancel() { closed = true; },
   });
-
-  return new Response(stream, {
-    headers: {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      Connection: 'keep-alive',
-    },
-  });
+  return new Response(stream, { headers: SSE_HEADERS });
 }

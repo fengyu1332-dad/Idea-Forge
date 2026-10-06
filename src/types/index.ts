@@ -1,10 +1,17 @@
+export type ProblemType = 'product' | 'engineering';
+
 // 专家类型
 export type ExpertType = 
   | 'product-architect'    // 产品策划专家
   | 'market-analyst'       // 市场预测专家
   | 'tech-lead'            // 技术实现专家
   | 'ux-ui-director'       // 产品设计专家
-  | 'growth-hacker';       // 产品营销专家
+  | 'growth-hacker'
+  | 'systems-engineer'
+  | 'triz-engineer'
+  | 'test-engineer'
+  | 'reliability-engineer'
+  | 'implementation-engineer';
 
 // 专家信息
 export interface Expert {
@@ -110,6 +117,8 @@ export interface Project {
   currentStage: WorkflowStage;
   progress: number;
   userInput: string;
+  problemType: ProblemType;
+  workflowVersion?: number;
   initialIdea: string;
   finalDocument: string;
   expertReports: Partial<Record<ExpertType, ExpertReport>>;

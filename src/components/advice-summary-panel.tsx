@@ -11,11 +11,12 @@ import {
   AccordionTrigger,
 } from '@/components/ui/accordion';
 import { Star, ArrowLeft, ArrowRight, Target } from 'lucide-react';
-import { EXPERTS } from '@/config/experts';
-import { ExpertType, ExpertReport, AdviceItem } from '@/types';
+import { getExperts } from '@/config/experts';
+import { ExpertType, ExpertReport, AdviceItem, ProblemType } from '@/types';
 import { useLanguage } from '@/hooks/useLanguage';
 
 interface AdviceSummaryPanelProps {
+  problemType: ProblemType;
   expertReports: Partial<Record<ExpertType, ExpertReport>>;
   onUpdateReports: (reports: Partial<Record<ExpertType, ExpertReport>>) => void;
   onProceedToSynthesis: () => void;
@@ -23,12 +24,14 @@ interface AdviceSummaryPanelProps {
 }
 
 export function AdviceSummaryPanel({
+  problemType,
   expertReports,
   onUpdateReports,
   onProceedToSynthesis,
   onBackToReview,
 }: AdviceSummaryPanelProps) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const EXPERTS = getExperts(problemType);
   const [reports, setReports] = useState(expertReports);
 
   const togglePriority = (expertId: ExpertType, itemId: string) => {
@@ -95,6 +98,7 @@ export function AdviceSummaryPanel({
         <p className="text-slate-400 text-sm">
           {t('adviceSummary.desc').replace('{count}', String(allCheckedItems.length))}
         </p>
+        <p className="text-amber-300/80 text-xs">{t('review.riskRetention')}</p>
       </CardHeader>
       <CardContent className="space-y-4">
         {allCheckedItems.length === 0 ? (
@@ -120,7 +124,7 @@ export function AdviceSummaryPanel({
                   <AccordionTrigger className="hover:no-underline py-3">
                     <div className="flex items-center gap-3">
                       <span className="text-lg">{expert.icon}</span>
-                      <span className="text-white text-sm font-medium">{expert.name}</span>
+                      <span className="text-white text-sm font-medium">{language === 'zh' ? expert.name : expert.title}</span>
                       <Badge variant="outline" className="text-xs text-slate-400 border-slate-600">
                         {checkedOpinions.length} {t('adviceSummary.itemsCount') || '条'}
                       </Badge>
@@ -196,7 +200,6 @@ export function AdviceSummaryPanel({
             </Button>
             <Button
               onClick={onProceedToSynthesis}
-              disabled={allCheckedItems.length === 0}
               className="bg-orange-500 hover:bg-orange-600 text-white"
             >
               {t('adviceSummary.proceedToGenerate')}

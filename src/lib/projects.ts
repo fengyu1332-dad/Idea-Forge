@@ -3,6 +3,7 @@ import path from 'path';
 import { randomBytes } from 'crypto';
 import { ensureDataDir } from './bootstrap';
 import { Project, ProjectSummary } from '@/types';
+import { getSavedProblemType } from '@/config/problem-types';
 
 const PROJECTS_DIR = path.join(process.cwd(), 'data', 'projects');
 const INDEX_FILE = path.join(PROJECTS_DIR, 'index.json');
@@ -67,7 +68,8 @@ async function readProjectFile(id: string): Promise<Project | null> {
   try {
     const file = path.join(PROJECTS_DIR, `${id}.json`);
     const raw = await readFile(file, 'utf-8');
-    return JSON.parse(raw);
+    const project = JSON.parse(raw);
+    return { ...project, problemType: getSavedProblemType(project.problemType) };
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
     throw error;
@@ -112,6 +114,8 @@ export async function createProject(
     currentStage: 'need-sensing',
     progress: 0,
     userInput: '',
+    problemType: 'product',
+    workflowVersion: 2,
     initialIdea: '',
     finalDocument: '',
     expertReports: {},

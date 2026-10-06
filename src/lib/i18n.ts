@@ -5,10 +5,11 @@
 export type Language = 'zh' | 'en';
 
 export const translations = {
+  'review.riskRetention': { zh: '未勾选或删除意见不代表风险已经解除。原始评审会保留，关键风险及证据缺口仍需在最终计划中交代。', en: 'Deselecting or deleting an opinion does not resolve its risk. Original reviews are retained so the final plan can address key risks and evidence gaps.' },
   // === 全局 ===
   'app.title': { zh: '灵感锻造炉', en: 'IdeaForge' },
-  'app.subtitle': { zh: '将你的毛坯想法锻造为成熟产品方案', en: 'Forge your raw ideas into polished product solutions' },
-  'app.footer': { zh: '灵感锻造炉 IdeaForge - AI虚拟产品委员会', en: 'IdeaForge - AI Virtual Product Committee' },
+  'app.subtitle': { zh: "把问题与构想转化为可检验的行动计划", en: "Turn problems and ideas into testable action plans" },
+  'app.footer': { zh: "灵感锻造炉 IdeaForge - AI 多视角评审", en: "IdeaForge - AI Review Perspectives" },
 
   // === 进度 ===
   'progress.label': { zh: '锻造进度', en: 'Progress' },
@@ -27,7 +28,7 @@ export const translations = {
 
   // === 阶段一：灵感输入 ===
   'input.title': { zh: '阶段一：灵感输入', en: 'Phase 1: Idea Input' },
-  'input.desc': { zh: '用大白话描述你的产品想法，可以是模糊的、不完整的。我们会帮你完善它。', en: 'Describe your product idea in plain language. It can be vague or incomplete. We will help you refine it.' },
+  'input.desc': { zh: "描述要解决的问题、已有证据和约束。没有数据的部分可以标为待补充。", en: "Describe the problem, available evidence and constraints. Mark missing information as unknown." },
   'input.placeholder': { zh: '例如：我想要做一款帮助程序员管理碎片化时间的APP，解决他们在多任务切换时容易忘记重要事项的问题...', en: 'e.g., I want to build an app that helps programmers manage fragmented time, solving the problem of forgetting important tasks when switching between multiple tasks...' },
   'input.backToSensing': { zh: '返回需求感知', en: 'Back to Need Sensing' },
   'input.directionSelected': { zh: '已选择创新方向', en: 'Direction selected' },
@@ -36,7 +37,7 @@ export const translations = {
 
   // === 阶段二：初步构想 ===
   'idea.title': { zh: '阶段二：初步构想', en: 'Phase 2: Initial Concept' },
-  'idea.desc': { zh: 'AI根据你的想法生成的初步产品方案。你可以直接修改内容，确认后将进入专家考验阶段。', en: 'AI-generated initial product concept based on your idea. You can edit the content directly. After confirmation, you will enter the expert review phase.' },
+  'idea.desc': { zh: "这是待验证的初步假设。请补充真实数据、修改约束，再进入 AI 评审。", en: "This is an initial hypothesis. Add evidence and correct constraints before AI review." },
   'idea.placeholder': { zh: '等待AI生成...', en: 'Waiting for AI to generate...' },
   'idea.back': { zh: '返回修改', en: 'Back to Edit' },
   'idea.exportMd': { zh: '导出Markdown', en: 'Export Markdown' },
@@ -49,8 +50,8 @@ export const translations = {
 
   // === 阶段四：终极熔铸 ===
   'synthesis.title': { zh: '阶段四：终极熔铸', en: 'Phase 4: Final Synthesis' },
-  'synthesis.desc': { zh: '综合所有专家的观点，生成最终的《产品综合商业计划与需求文档》', en: 'Synthesize all expert perspectives into the final Product Business Plan & Requirements Document' },
-  'synthesis.ready': { zh: '五位专家已完成评审，现在可以生成最终的综合方案', en: 'All five experts have completed their reviews. You can now generate the final synthesis.' },
+  'synthesis.desc': { zh: "按需求类型生成产品验证计划或工程试验方案与验收指标。", en: "Generate a product validation plan or an engineering test plan and acceptance criteria." },
+  'synthesis.ready': { zh: "根据评审记录生成验证计划，并保留未解决风险。", en: "Build a validation plan from the review records, retaining unresolved risks." },
   'synthesis.generate': { zh: '一键生成综合方案', en: 'Generate Final Plan' },
   'synthesis.generating': { zh: '正在生成...', en: 'Generating...' },
   'synthesis.restart': { zh: '重新开始', en: 'Start Over' },
@@ -65,7 +66,7 @@ export const translations = {
 
   // === 意见汇总面板 ===
   'adviceSummary.title': { zh: '意见汇总', en: 'Advice Summary' },
-  'adviceSummary.desc': { zh: '以下意见将进入终极熔铸，请做最后确认', en: 'The following opinions will be incorporated into the final synthesis' },
+  'adviceSummary.desc': { zh: "勾选表示希望纳入行动计划；优先级用于安排验证顺序。", en: "Selected opinions guide the action plan; priority determines the order of validation." },
   'adviceSummary.itemsCount': { zh: '条', en: ' items' },
   'adviceSummary.proceedToGenerate': { zh: '确认并进入终极熔铸', en: 'Confirm & Proceed to Synthesis' },
   'adviceSummary.stats': { zh: '共 {total} 条（⭐高优 {high} · 中优 {medium} · ○低优 {low}）', en: '{total} items (⭐{high} high · {medium} medium · {low} low)' },
@@ -74,7 +75,7 @@ export const translations = {
   'adviceSummary.priorityMedium': { zh: '中优', en: 'Medium' },
   'adviceSummary.priorityLow': { zh: '低优', en: 'Low' },
   'adviceSummary.remove': { zh: '移除', en: 'Remove' },
-  'adviceSummary.empty': { zh: '没有已采纳的意见。请返回专家评审至少勾选一条意见。', en: 'No accepted opinions. Please go back and check at least one.' },
+  'adviceSummary.empty': { zh: "未选择实施建议。仍可生成以证据缺口与风险验证为主的计划。", en: "No implementation suggestions selected. You can still create a plan to investigate evidence gaps and risks." },
   'adviceSummary.totalLabel': { zh: '共', en: 'Total' },
 
   // === 需求感知 ===
@@ -98,7 +99,7 @@ export const translations = {
   'sensing.atLeastOne': { zh: '请至少选择一种方法论', en: 'Please select at least one method' },
 
   // === 专家评审面板 ===
-  'expertReview.panelDesc': { zh: '五位专家正在对方案进行独立评审，每位专家从自己的专业领域出发给出意见', en: 'Five experts are independently reviewing the plan, each offering opinions from their domain.' },
+  'expertReview.panelDesc': { zh: "同一 AI 服务从五个专业视角审视方案；这些意见不等于五位真人专家的独立验证。", en: "The same AI service reviews the plan from five professional perspectives. These are not independent validations by five human experts." },
   'expertReview.generating': { zh: '正在生成...', en: 'Generating...' },
   'expertReview.analyzing': { zh: '专家正在分析方案...', en: 'Expert is analyzing the plan...' },
   'expertReview.noOpinions': { zh: '暂无意见', en: 'No opinions yet' },
@@ -140,7 +141,7 @@ export const translations = {
   'export.expertSection': { zh: '三、专家考验报告', en: '3. Expert Review Reports' },
   'export.rawReportLabel': { zh: '原始报告', en: 'Raw Report' },
   'export.acceptedOpinions': { zh: '被采纳的意见', en: 'Accepted Opinions' },
-  'export.finalSection': { zh: '四、终极熔铸 - 产品综合商业计划与需求文档', en: '4. Final Synthesis - Product Business Plan & Requirements Document' },
+  'export.finalSection': { zh: "四、终极熔铸 - 验证计划", en: "4. Final Synthesis - Validation Plan" },
   'export.generateDate': { zh: '生成日期', en: 'Generated Date' },
   'export.description': { zh: '描述', en: 'Description' },
 
@@ -157,11 +158,11 @@ export const translations = {
   'error.invalidResponse': { zh: 'AI 服务返回的数据不完整或格式异常，请重试。', en: 'The AI service returned an incomplete or invalid response. Please try again.' },
 
   // === 专家名称 ===
-  'expert.product-architect': { zh: '产品策划专家', en: 'Product Architect' },
-  'expert.market-analyst': { zh: '市场预测专家', en: 'Market Analyst' },
-  'expert.tech-lead': { zh: '技术实现专家', en: 'Tech Lead' },
-  'expert.ux-ui-director': { zh: '产品视觉设计专家', en: 'UX/UI Director' },
-  'expert.growth-hacker': { zh: '产品营销专家', en: 'Growth Hacker' },
+  'expert.product-architect': { zh: "需求与产品验证", en: "Problem & Product Validation" },
+  'expert.market-analyst': { zh: "市场与替代方案研究", en: "Market & Alternatives" },
+  'expert.tech-lead': { zh: "技术可行性", en: "Technical Feasibility" },
+  'expert.ux-ui-director': { zh: "体验与用户测试", en: "Usability & User Testing" },
+  'expert.growth-hacker': { zh: "付费与获客验证", en: "Payment & Acquisition Validation" },
 
   // === 专家描述 ===
   'expertDesc.product-architect': { zh: '逻辑严密、关注核心需求。批判伪需求、逻辑漏洞、功能堆砌。', en: 'Rigorous logic, focused on core needs. Critical of pseudo-needs, logic holes, and feature bloat.' },
@@ -194,18 +195,18 @@ export const translations = {
 
   // === 引导（Onboarding）===
   'onboarding.welcome': { zh: '欢迎使用灵感锻造炉 IdeaForge', en: 'Welcome to IdeaForge' },
-  'onboarding.subtitle': { zh: '5步将你的毛坯想法锻造为成熟产品方案。每个阶段都可以随时返回修改。', en: 'Forge your raw idea into a polished product plan in 5 steps. Return to any stage to revise at any time.' },
+  'onboarding.subtitle': { zh: "先选择产品构思或工程改进，再分阶段定义问题、检查假设和设计验证。", en: "Choose product concept or engineering improvement, then define the problem, review assumptions and design validation." },
   'onboarding.start': { zh: '开始使用', en: 'Get Started' },
   'onboarding.step1.title': { zh: '需求感知', en: 'Need Sensing' },
-  'onboarding.step1.desc': { zh: '描述你的痛点或需求，AI 运用创新方法论（TRIZ、JTBD、第一性原理等）深入分析，给出最佳创新方向。', en: 'Describe your pain point or need. AI applies innovation methodologies (TRIZ, JTBD, First Principles, etc.) to analyze deeply and suggest the best direction.' },
+  'onboarding.step1.desc': { zh: "描述需求与约束，选择适用的创新方法，形成待验证方向和资料缺口。", en: "Describe the need and constraints. Use suitable methods to identify candidate directions and evidence gaps." },
   'onboarding.step2.title': { zh: '灵感输入', en: 'Idea Input' },
-  'onboarding.step2.desc': { zh: '选择创新方向后，用大白话描述你的产品想法。可以是模糊的、不完整的，AI 会帮你完善。', en: 'After choosing a direction, describe your product idea in plain language. It can be vague or incomplete — AI will help refine it.' },
+  'onboarding.step2.desc': { zh: "补充目标、已有数据和不可突破的约束。可以明确写出未知信息。", en: "Add goals, available data and hard constraints. Unknown information can remain explicit." },
   'onboarding.step3.title': { zh: '初步构想', en: 'Initial Concept' },
-  'onboarding.step3.desc': { zh: 'AI 根据你的想法生成初步产品方案，你可以直接编辑和修改内容，确认后进入专家考验。', en: 'AI generates an initial product concept from your idea. Edit it directly, then confirm to enter expert review.' },
+  'onboarding.step3.desc': { zh: "AI 生成产品概念或工程改进假设。补充证据、修改内容后进入评审。", en: "AI drafts a product concept or engineering hypothesis. Add evidence and edit it before review." },
   'onboarding.step4.title': { zh: '专家考验', en: 'Expert Review' },
-  'onboarding.step4.desc': { zh: '五位领域专家（产品、市场、技术、设计、营销）同时审视方案，给出诚实、可操作的意见。你勾选认可的意见进入最终合成。', en: 'Five experts (product, market, tech, design, marketing) review your plan simultaneously and give honest, actionable feedback. Check the ones you accept to proceed.' },
+  'onboarding.step4.desc': { zh: "AI 按需求类型切换五个评审视角。选择希望实施的建议，关键风险仍保留待验证。", en: "AI uses five perspectives matched to your problem type. Select actions to pursue; key risks remain open until validated." },
   'onboarding.step5.title': { zh: '终极熔铸', en: 'Final Synthesis' },
-  'onboarding.step5.desc': { zh: '综合你的想法和专家意见，AI 生成完整的《产品综合商业计划与需求文档》，包含市场分析、功能规划、技术架构、GTM策略等。', en: 'AI synthesizes your idea and expert opinions into a complete Product Business Plan & Requirements Document, covering market analysis, features, architecture, GTM strategy, and more.' },
+  'onboarding.step5.desc': { zh: "产品构思输出假设、用户测试及决策条件；工程改进输出对照试验、测量方法与验收指标。", en: "Product concepts produce hypotheses, user tests and decision gates. Engineering improvements produce controlled tests, measurement methods and acceptance criteria." },
 
   // === 项目列表 ===
   'projectList.title': { zh: '我的项目', en: 'My Projects' },

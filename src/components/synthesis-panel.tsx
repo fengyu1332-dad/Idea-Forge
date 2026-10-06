@@ -17,8 +17,13 @@ import { Loader2, Rocket, Sparkles, AlertTriangle, Download, FileText } from 'lu
 import { MarkdownRenderer } from '@/components/markdown-renderer';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useState } from 'react';
+import { PROBLEM_PROFILES } from '@/config/problem-types';
+import type { ProblemType } from '@/types';
+import { EvidenceNotice } from './evidence-notice';
 
 interface SynthesisPanelProps {
+  problemType: ProblemType;
+  isCompleted: boolean;
   finalDocument: string;
   isGenerating: boolean;
   progressText?: string;
@@ -29,6 +34,8 @@ interface SynthesisPanelProps {
 }
 
 export function SynthesisPanel({
+  problemType,
+  isCompleted,
   finalDocument,
   isGenerating,
   progressText,
@@ -37,7 +44,8 @@ export function SynthesisPanel({
   onExportMarkdown,
   onExportComplete,
 }: SynthesisPanelProps) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const profile = PROBLEM_PROFILES[problemType];
   const [showResetDialog, setShowResetDialog] = useState(false);
 
   return (
@@ -48,10 +56,14 @@ export function SynthesisPanel({
           {t('synthesis.title')}
         </CardTitle>
         <CardDescription className="text-slate-400">
-          {t('synthesis.desc')}
+          {profile.deliverable[language]} — {profile.description[language]}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        <EvidenceNotice />
+        {finalDocument && !isGenerating && !isCompleted && (
+          <p role="alert" className="text-amber-300 text-sm">{language === 'zh' ? '这是未完成草稿，请重新生成后再用于评审。' : 'This draft is incomplete. Regenerate it before review.'}</p>
+        )}
         {!finalDocument && !isGenerating && (
           <div className="flex flex-col items-center justify-center py-12">
             <AlertTriangle className="w-16 h-16 text-orange-400 mb-4" />

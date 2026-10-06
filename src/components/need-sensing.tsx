@@ -12,8 +12,14 @@ import { useAuth } from '@/hooks/useAuth';
 import { InnovationMethod } from '@/config/need-sensing';
 import { readGenerationStream } from '@/lib/generation-stream';
 import { getGenerationErrorMessage } from '@/lib/generation-errors';
+import { ProblemTypeSelector } from './problem-type-selector';
+import { EvidenceNotice } from './evidence-notice';
+import { PROBLEM_PROFILES } from '@/config/problem-types';
+import type { ProblemType } from '@/types';
 
 interface NeedSensingProps {
+  problemType: ProblemType;
+  onProblemTypeChange: (value: ProblemType) => void;
   onSkip: () => void;
   onSelectDirection: (data: {
     userNeed: string;
@@ -27,8 +33,8 @@ interface NeedSensingProps {
   methods: InnovationMethod[];
 }
 
-export function NeedSensing({ onSkip, onSelectDirection, methods }: NeedSensingProps) {
-  const { t } = useLanguage();
+export function NeedSensing({ onSkip, onSelectDirection, methods, problemType, onProblemTypeChange }: NeedSensingProps) {
+  const { t, language } = useLanguage();
   const { isAdmin } = useAuth();
   const [userNeed, setUserNeed] = useState('');
   const [analysisResult, setAnalysisResult] = useState('');
@@ -75,6 +81,8 @@ export function NeedSensing({ onSkip, onSelectDirection, methods }: NeedSensingP
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userNeed,
+          problemType,
+          language,
           selectedMethodIds,
           customMethodPrompts,
           selectedMethodModes,
@@ -160,6 +168,13 @@ export function NeedSensing({ onSkip, onSelectDirection, methods }: NeedSensingP
           <p className="text-slate-400 text-sm">{t('sensing.subtitle')}</p>
         </CardHeader>
         <CardContent className="space-y-6">
+          <ProblemTypeSelector value={problemType} disabled={isLoading} onChange={value => {
+            setAnalysisResult('');
+            setAnalysisError(null);
+            setDirections([]);
+            onProblemTypeChange(value);
+          }} />
+          <EvidenceNotice />
           {/* 需求输入 */}
           <div>
             <label className="text-sm font-medium text-slate-300 mb-2 block">
@@ -168,7 +183,7 @@ export function NeedSensing({ onSkip, onSelectDirection, methods }: NeedSensingP
             <Textarea
               value={userNeed}
               onChange={(e) => setUserNeed(e.target.value)}
-              placeholder={t('sensing.placeholder')}
+              placeholder={PROBLEM_PROFILES[problemType].placeholder[language]}
               className="min-h-[80px] bg-slate-800 border-slate-600 text-white placeholder:text-slate-500"
             />
           </div>

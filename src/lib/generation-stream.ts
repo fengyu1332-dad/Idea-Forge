@@ -1,6 +1,7 @@
 import { GenerationError, type GenerationErrorCode } from './generation-errors';
 
-interface GenerationEvent {
+export interface GenerationEvent {
+  expertId?: string;
   content?: string;
   done?: boolean;
   error?: boolean | string;
@@ -10,7 +11,7 @@ interface GenerationEvent {
 }
 
 /** Read our SSE protocol without assuming a network chunk is a complete event. */
-export async function* readGenerationStream(response: Response): AsyncGenerator<string> {
+export async function* readGenerationEvents(response: Response): AsyncGenerator<GenerationEvent> {
   if (!response.ok) {
     const body = await response.json().catch(() => null);
     const message = typeof body?.message === 'string' ? body.message
@@ -27,7 +28,6 @@ export async function* readGenerationStream(response: Response): AsyncGenerator<
   const decoder = new TextDecoder();
   let buffer = '';
   let completed = false;
-  let hasContent = false;
 
   try {
     while (!completed) {
@@ -47,13 +47,10 @@ export async function* readGenerationStream(response: Response): AsyncGenerator<
           throw new GenerationError('INVALID_RESPONSE', 'The AI stream contains an invalid event.');
         }
         // Error events also carry done: true; handle the error first.
-        if (event.error) {
+        if (event.error && !event.expertId) {
           throw new GenerationError(event.code || 'AI_UNAVAILABLE', event.message || 'AI generation failed.', event.status);
         }
-        if (typeof event.content === 'string' && event.content) {
-          hasContent = true;
-          yield event.content;
-        }
+        yield event;
         if (event.done) {
           completed = true;
           break;
@@ -62,7 +59,6 @@ export async function* readGenerationStream(response: Response): AsyncGenerator<
       if (done) break;
     }
     if (!completed) throw new GenerationError('STREAM_INTERRUPTED', 'The AI stream ended before completion.');
-    if (!hasContent) throw new GenerationError('INVALID_RESPONSE', 'The AI response was empty.');
   } catch (error) {
     if (error instanceof GenerationError) throw error;
     throw new GenerationError('STREAM_INTERRUPTED', 'The AI stream was interrupted.');
@@ -70,4 +66,16 @@ export async function* readGenerationStream(response: Response): AsyncGenerator<
     await reader.cancel().catch(() => {});
     reader.releaseLock();
   }
+}
+
+export async function* readGenerationStream(response: Response): AsyncGenerator<string> {
+  let hasContent = false;
+  for await (const event of readGenerationEvents(response)) {
+    if (event.error) throw new GenerationError(event.code || 'AI_UNAVAILABLE', event.message || 'AI generation failed.', event.status);
+    if (typeof event.content === 'string' && event.content) {
+      hasContent = true;
+      yield event.content;
+    }
+  }
+  if (!hasContent) throw new GenerationError('INVALID_RESPONSE', 'The AI response was empty.');
 }

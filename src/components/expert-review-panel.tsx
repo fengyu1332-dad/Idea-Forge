@@ -20,11 +20,15 @@ import {
   ArrowLeft,
 } from 'lucide-react';
 import { useLanguage } from '@/hooks/useLanguage';
-import { EXPERTS } from '@/config/experts';
-import { ExpertType, ExpertReport, AdviceItem } from '@/types';
+import { getExperts } from '@/config/experts';
+import { readGenerationEvents } from '@/lib/generation-stream';
+import { GenerationError, getGenerationErrorMessage } from '@/lib/generation-errors';
+import { ExpertType, ExpertReport, AdviceItem, ProblemType } from '@/types';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface ExpertReviewPanelProps {
+  problemType: ProblemType;
+  initialReports?: Partial<Record<ExpertType, ExpertReport>>;
   userInput: string;
   initialIdea: string;
   onConfirm: (reports: Partial<Record<ExpertType, ExpertReport>>) => void;
@@ -32,7 +36,9 @@ interface ExpertReviewPanelProps {
 }
 
 interface ExpertState {
-  status: 'pending' | 'loading' | 'done';
+  status: 'pending' | 'loading' | 'done' | 'error';
+  rawContent: string;
+  error?: string;
   opinions: AdviceItem[];
 }
 
@@ -70,84 +76,73 @@ function parseOpinions(rawContent: string, expertType: ExpertType): AdviceItem[]
   return items;
 }
 
-export function ExpertReviewPanel({ userInput, initialIdea, onConfirm, onBack }: ExpertReviewPanelProps) {
+export function ExpertReviewPanel({ userInput, initialIdea, problemType, initialReports, onConfirm, onBack }: ExpertReviewPanelProps) {
   const { t, language } = useLanguage();
-  const [experts, setExperts] = useState<Record<string, ExpertState>>({});
+  const expertList = getExperts(problemType);
+  const [experts, setExperts] = useState<Record<string, ExpertState>>(() =>
+    Object.fromEntries(expertList.map(e => {
+      const report = initialReports?.[e.id];
+      return [e.id, report
+        ? { status: 'done', opinions: report.opinions, rawContent: report.rawContent }
+        : { status: 'loading', opinions: [], rawContent: '' }];
+    })));
+  const [requests, setRequests] = useState<ExpertType[]>(() =>
+    expertList.filter(e => !initialReports?.[e.id]).map(e => e.id));
 
-  // 初始化专家状态
   useEffect(() => {
-    setExperts(
-      Object.fromEntries(
-        EXPERTS.map(e => [e.id, { status: 'loading' as const, opinions: [] }]),
-      ),
-    );
-
+    if (!requests.length) return;
     const controller = new AbortController();
-
     (async () => {
+      const received = new Set<string>();
+      const markError = (id: string, error: unknown) => {
+        if (controller.signal.aborted) return;
+        setExperts(prev => ({ ...prev, [id]: {
+          ...prev[id], status: 'error', error: getGenerationErrorMessage(error, t),
+        } }));
+      };
       try {
         const response = await fetch('/api/generate-expert-reports', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userInput, initialIdea }),
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userInput, initialIdea, problemType, language, expertIds: requests }),
           signal: controller.signal,
         });
-
-        if (!response.ok) throw new Error('API error');
-
-        const reader = response.body?.getReader();
-        if (!reader) throw new Error('No reader');
-
-        const decoder = new TextDecoder();
-        let buffer = '';
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          buffer = lines.pop() || '';
-
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              try {
-                const data = JSON.parse(line.slice(6));
-                if (data.done) break;
-                if (data.error) throw new Error(data.error);
-                if (data.expertId && data.content) {
-                  const opinions = parseOpinions(data.content, data.expertId as ExpertType);
-                  setExperts(prev => ({
-                    ...prev,
-                    [data.expertId]: { status: 'done', opinions },
-                  }));
-                }
-              } catch {
-                // 忽略解析错误
-              }
+        for await (const data of readGenerationEvents(response)) {
+          if (controller.signal.aborted) return;
+          const id = data.expertId as ExpertType | undefined;
+          if (!id || !requests.includes(id)) continue;
+          received.add(id);
+          if (data.error) {
+            markError(id, new GenerationError(data.code || 'AI_UNAVAILABLE', data.message || '', data.status));
+          } else {
+            const rawContent = data.content || '';
+            const opinions = parseOpinions(rawContent, id);
+            if (!opinions.length) {
+              markError(id, new GenerationError('INVALID_RESPONSE', 'No review opinions.'));
+            } else {
+              setExperts(prev => ({ ...prev, [id]: { status: 'done', opinions, rawContent } }));
             }
           }
         }
-      } catch (error) {
-        if ((error as Error).name !== 'AbortError') {
-          // 标记所有仍在 loading 的专家为 done（显示为错误状态）
-          setExperts(prev => {
-            const next = { ...prev };
-            for (const key of Object.keys(next)) {
-              if (next[key].status === 'loading') {
-                next[key] = { status: 'done', opinions: [] };
-              }
-            }
-            return next;
-          });
+        for (const id of requests) {
+          if (!received.has(id)) markError(id, new GenerationError('STREAM_INTERRUPTED', 'Review missing.'));
         }
+      } catch (error) {
+        for (const id of requests) if (!received.has(id)) markError(id, error);
+      } finally {
+        if (!controller.signal.aborted) setRequests([]);
       }
     })();
-
     return () => controller.abort();
-  }, [userInput, initialIdea]);
+  }, [userInput, initialIdea, problemType, language, requests, t]);
 
-  const allDone = Object.values(experts).every(e => e.status === 'done');
+  const allDone = expertList.every(e => experts[e.id]?.status === 'done');
+  const failedIds = expertList.filter(e => experts[e.id]?.status === 'error').map(e => e.id);
+  const retryFailed = () => {
+    setExperts(prev => Object.fromEntries(Object.entries(prev).map(([id, state]) => [
+      id, failedIds.includes(id as ExpertType) ? { ...state, status: 'loading', error: undefined } : state,
+    ])));
+    setRequests(failedIds);
+  };
 
   const toggleOpinion = useCallback((expertId: string, itemId: string) => {
     setExperts(prev => {
@@ -240,7 +235,7 @@ export function ExpertReviewPanel({ userInput, initialIdea, onConfirm, onBack }:
       reports[expertId as ExpertType] = {
         expertId: expertId as ExpertType,
         opinions: state.opinions,
-        rawContent: state.opinions.map(o => `- ${o.content}`).join('\n'),
+        rawContent: state.rawContent,
       };
     }
     onConfirm(reports);
@@ -266,11 +261,12 @@ export function ExpertReviewPanel({ userInput, initialIdea, onConfirm, onBack }:
         </CardTitle>
         <p className="text-slate-400 text-sm">
           {t('expertReview.panelDesc')}
+          <span className="block mt-2">{t('review.riskRetention')}</span>
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
-        <Accordion type="multiple" defaultValue={EXPERTS.map(e => e.id)} className="space-y-3">
-          {EXPERTS.map(expert => {
+        <Accordion type="multiple" defaultValue={expertList.map(e => e.id)} className="space-y-3">
+          {expertList.map(expert => {
             const state = experts[expert.id];
             const status = state?.status || 'pending';
 
@@ -283,7 +279,7 @@ export function ExpertReviewPanel({ userInput, initialIdea, onConfirm, onBack }:
                 <AccordionTrigger className="hover:no-underline py-3">
                   <div className="flex items-center gap-3">
                     <span className="text-lg">{expert.icon}</span>
-                    <span className="text-white text-sm font-medium">{expert.name}</span>
+                    <span className="text-white text-sm font-medium">{language === 'zh' ? expert.name : expert.title}</span>
                     {status === 'loading' && (
                       <span className="flex items-center gap-1 text-xs text-orange-400">
                         <Loader2 className="w-3 h-3 animate-spin" />
@@ -302,6 +298,9 @@ export function ExpertReviewPanel({ userInput, initialIdea, onConfirm, onBack }:
                   </div>
                 </AccordionTrigger>
                 <AccordionContent className="pb-4 space-y-1.5">
+                  {status === 'error' && (
+                    <p role="alert" className="text-red-300 text-sm py-2">{state.error}</p>
+                  )}
                   {status === 'loading' && (
                     <div className="flex items-center gap-2 text-slate-500 text-sm py-2">
                       <Loader2 className="w-4 h-4 animate-spin" />
@@ -343,6 +342,9 @@ export function ExpertReviewPanel({ userInput, initialIdea, onConfirm, onBack }:
                           <TooltipTrigger asChild>
                             <button
                               onClick={() => toggleOpinion(expert.id, item.id)}
+                              role="checkbox"
+                              aria-checked={item.checked}
+                              aria-label={language === 'zh' ? '采纳意见' : 'Include opinion'}
                               className={`mt-0.5 w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center transition-colors ${
                                 item.checked
                                   ? 'bg-orange-500 border-orange-500'
@@ -367,7 +369,7 @@ export function ExpertReviewPanel({ userInput, initialIdea, onConfirm, onBack }:
                         value={item.content}
                         onChange={e => updateOpinion(expert.id, item.id, e.target.value)}
                         className="flex-1 bg-transparent border-none text-slate-300 text-sm p-0 min-h-[24px] h-auto resize-none focus-visible:ring-0 focus-visible:ring-offset-0"
-                        rows={1}
+                        rows={3}
                       />
 
                       {/* Delete */}
@@ -400,6 +402,12 @@ export function ExpertReviewPanel({ userInput, initialIdea, onConfirm, onBack }:
             );
           })}
         </Accordion>
+
+        {failedIds.length > 0 && requests.length === 0 && (
+          <Button variant="outline" onClick={retryFailed} className="border-orange-500 text-orange-400">
+            {language === 'zh' ? '重试未完成的评审' : 'Retry incomplete reviews'}
+          </Button>
+        )}
 
         {/* Bottom bar */}
         <div className="flex items-center justify-between pt-2 border-t border-slate-700">
